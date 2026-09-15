@@ -19,6 +19,11 @@ const el = {
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
   demoBtn: document.getElementById("demo-btn"),
+  heroPreview: document.getElementById("hero-preview"),
+  heroVisual: document.querySelector("#hero-preview .mini-visual"),
+  heroImg: document.querySelector("#hero-preview .mini-img"),
+  heroEyeL: document.getElementById("hero-eye-l"),
+  heroEyeR: document.getElementById("hero-eye-r"),
   calibrate: document.getElementById("calibrate"),
   calibrateStep: document.getElementById("calibrate-step"),
   calibrateStage: document.getElementById("calibrate-stage"),
@@ -411,13 +416,39 @@ window.addEventListener("pointerdown", (e) => {
   lastPointerTime = performance.now();
 });
 
-let currentTilt = 0;
+const instances = [];
+
+function registerBuddy({ root, visual, eyeL, eyeR, visible }) {
+  const inst = { root, visual, eyeL, eyeR, visible, tilt: 0 };
+  instances.push(inst);
+  scheduleBlink(inst);
+  return inst;
+}
+
+const cornerInstance = registerBuddy({
+  root: el.mascot,
+  visual: el.mascotVisual,
+  eyeL: el.eyeL,
+  eyeR: el.eyeR,
+  visible: () => !el.mascot.hidden,
+});
+
+const heroInstance = registerBuddy({
+  root: el.heroPreview,
+  visual: el.heroVisual,
+  eyeL: el.heroEyeL,
+  eyeR: el.heroEyeR,
+  visible: () => !el.intro.hidden,
+});
+el.heroImg.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(DEMO_SVG);
+el.heroVisual.addEventListener("click", () => poke(heroInstance));
 
 function trackLoop() {
-  if (!el.mascot.hidden) {
-    const mrect = el.mascot.getBoundingClientRect();
-    const mcx = mrect.left + mrect.width / 2;
-    const mcy = mrect.top + mrect.height / 2;
+  instances.forEach((inst) => {
+    if (!inst.visible()) return;
+    const rect = inst.root.getBoundingClientRect();
+    const mcx = rect.left + rect.width / 2;
+    const mcy = rect.top + rect.height / 2;
 
     const idle = performance.now() - lastPointerTime > IDLE_MS;
     let targetX = pointer.x;
@@ -432,61 +463,61 @@ function trackLoop() {
       targetY = mcy;
     }
 
-    [el.eyeL, el.eyeR].forEach((eye) => {
-      const rect = eye.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
+    [inst.eyeL, inst.eyeR].forEach((eye) => {
+      const eyeRect = eye.getBoundingClientRect();
+      const cx = eyeRect.left + eyeRect.width / 2;
+      const cy = eyeRect.top + eyeRect.height / 2;
       const dx = targetX - cx;
       const dy = targetY - cy;
       const angle = Math.atan2(dy, dx);
-      const maxOffset = rect.width * 0.24;
+      const maxOffset = eyeRect.width * 0.24;
       const dist = Math.min(Math.hypot(dx, dy) * 0.06, maxOffset);
       const pupil = eye.querySelector(".pupil");
       pupil.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
     });
 
     if (prefersReducedMotion) {
-      currentTilt = 0;
-      el.mascotVisual.style.transform = "";
+      inst.tilt = 0;
+      inst.visual.style.transform = "";
     } else {
       const targetTilt = Math.max(-8, Math.min(8, (targetX - mcx) / 22));
-      currentTilt += (targetTilt - currentTilt) * 0.12;
-      el.mascotVisual.style.transform = `rotate(${currentTilt.toFixed(2)}deg)`;
+      inst.tilt += (targetTilt - inst.tilt) * 0.12;
+      inst.visual.style.transform = `rotate(${inst.tilt.toFixed(2)}deg)`;
     }
-  }
+  });
   requestAnimationFrame(trackLoop);
 }
 requestAnimationFrame(trackLoop);
 
-function blink() {
-  if (el.mascot.hidden) return;
-  el.mascotVisual.classList.add("blinking");
-  setTimeout(() => el.mascotVisual.classList.remove("blinking"), 130);
+function blinkInstance(inst) {
+  if (!inst.visible()) return;
+  inst.visual.classList.add("blinking");
+  setTimeout(() => inst.visual.classList.remove("blinking"), 130);
 }
 
-function scheduleBlink() {
+function scheduleBlink(inst) {
   const delay = 2200 + Math.random() * 3800;
   setTimeout(() => {
-    blink();
-    scheduleBlink();
+    blinkInstance(inst);
+    scheduleBlink(inst);
   }, delay);
 }
-scheduleBlink();
 
-function poke() {
-  blink();
-  el.mascotVisual.classList.remove("poked");
-  void el.mascotVisual.offsetWidth;
-  el.mascotVisual.classList.add("poked");
+function poke(inst) {
+  blinkInstance(inst);
+  inst.visual.classList.remove("poked");
+  void inst.visual.offsetWidth;
+  inst.visual.classList.add("poked");
 }
-el.mascotVisual.addEventListener("click", poke);
+el.mascotVisual.addEventListener("click", () => poke(cornerInstance));
 el.mascotVisual.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
-    poke();
+    poke(cornerInstance);
   }
 });
 el.mascotVisual.addEventListener("animationend", () => el.mascotVisual.classList.remove("poked"));
+el.heroVisual.addEventListener("animationend", () => el.heroVisual.classList.remove("poked"));
 
 if (state && state.imageDataUrl && state.eyeL && state.eyeR) {
   renderMascot();
