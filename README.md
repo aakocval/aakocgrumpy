@@ -1,4 +1,4 @@
-# page-buddy
+# aakocbuddy
 
 Give any picture a pair of eyes. Inspired by [page-mascot](https://github.com/nilbuild/page-mascot), but instead of picking from a set of pre-drawn characters, you upload your own image — a photo, a logo, anything — and it becomes a cursor-tracking, blinking mascot pinned to the corner of the page.
 

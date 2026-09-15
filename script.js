@@ -1,4 +1,4 @@
-const STORAGE_KEY = "page-buddy-state-v1";
+const STORAGE_KEY = "aakocbuddy-state-v1";
 const MAX_IMAGE_DIM = 640;
 const MAX_FILE_BYTES = 30 * 1024 * 1024;
 const IDLE_MS = 3500;
@@ -364,7 +364,7 @@ function exportPNG() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "page-buddy.png";
+      a.download = "aakocbuddy.png";
       document.body.appendChild(a);
       a.click();
       a.remove();
