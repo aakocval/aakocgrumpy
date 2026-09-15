@@ -1,9 +1,24 @@
 const STORAGE_KEY = "page-buddy-state-v1";
 const MAX_IMAGE_DIM = 640;
+const MAX_FILE_BYTES = 30 * 1024 * 1024;
+const IDLE_MS = 3500;
+
+const DEMO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffb37a"/><stop offset="1" stop-color="#ff8a5c"/>
+  </linearGradient></defs>
+  <rect x="40" y="50" width="320" height="300" rx="140" ry="130" fill="url(#g)"/>
+  <ellipse cx="120" cy="232" rx="26" ry="15" fill="#ff6b4a" opacity="0.35"/>
+  <ellipse cx="280" cy="232" rx="26" ry="15" fill="#ff6b4a" opacity="0.35"/>
+  <path d="M160 265 Q200 296 240 265" stroke="#7a3412" stroke-width="9" fill="none" stroke-linecap="round"/>
+</svg>`;
 
 const el = {
+  toast: document.getElementById("toast"),
   intro: document.getElementById("intro"),
+  dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
+  demoBtn: document.getElementById("demo-btn"),
   calibrate: document.getElementById("calibrate"),
   calibrateStep: document.getElementById("calibrate-step"),
   calibrateStage: document.getElementById("calibrate-stage"),
@@ -12,6 +27,7 @@ const el = {
   calibrateReset: document.getElementById("calibrate-reset"),
   calibrateConfirm: document.getElementById("calibrate-confirm"),
   mascot: document.getElementById("mascot"),
+  mascotVisual: document.getElementById("mascot-visual"),
   mascotImg: document.getElementById("mascot-img"),
   eyeL: document.getElementById("eye-l"),
   eyeR: document.getElementById("eye-r"),
@@ -20,6 +36,7 @@ const el = {
   sizeRange: document.getElementById("size-range"),
   eyeRange: document.getElementById("eye-range"),
   cornerSelect: document.getElementById("corner-select"),
+  downloadBtn: document.getElementById("download-btn"),
   recalibrateBtn: document.getElementById("recalibrate-btn"),
   newImageBtn: document.getElementById("new-image-btn"),
 };
@@ -27,7 +44,26 @@ const el = {
 let state = loadState();
 let pendingImage = null;
 let calibMarks = [];
-let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+let pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+let lastPointerTime = 0;
+
+const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+let prefersReducedMotion = reduceMotionQuery.matches;
+reduceMotionQuery.addEventListener("change", (e) => { prefersReducedMotion = e.matches; });
+
+let toastTimer = null;
+function showToast(message, { sticky = false } = {}) {
+  el.toast.textContent = message;
+  el.toast.hidden = false;
+  requestAnimationFrame(() => el.toast.classList.add("visible"));
+  if (toastTimer) clearTimeout(toastTimer);
+  if (!sticky) toastTimer = setTimeout(hideToast, 3200);
+}
+function hideToast() {
+  if (toastTimer) clearTimeout(toastTimer);
+  el.toast.classList.remove("visible");
+  setTimeout(() => { el.toast.hidden = true; }, 200);
+}
 
 function loadState() {
   try {
@@ -42,19 +78,23 @@ function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    /* storage full or unavailable, ignore */
+    showToast("Couldn't save — your buddy won't stick around after you leave this page.");
   }
 }
 
 function readAndResizeImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error("read-failed"));
     reader.onload = (e) => {
       const img = new Image();
-      img.onerror = reject;
+      img.onerror = () => reject(new Error("decode-failed"));
       img.onload = () => {
         let { width, height } = img;
+        if (!width || !height) {
+          reject(new Error("zero-dimensions"));
+          return;
+        }
         if (width > MAX_IMAGE_DIM || height > MAX_IMAGE_DIM) {
           const scale = MAX_IMAGE_DIM / Math.max(width, height);
           width = Math.round(width * scale);
@@ -64,7 +104,9 @@ function readAndResizeImage(file) {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve({ dataUrl: canvas.toDataURL("image/png"), width, height });
+        const useJpeg = file.type === "image/jpeg" || file.type === "image/jpg";
+        const dataUrl = useJpeg ? canvas.toDataURL("image/jpeg", 0.85) : canvas.toDataURL("image/png");
+        resolve({ dataUrl, width, height });
       };
       img.src = e.target.result;
     };
@@ -72,18 +114,80 @@ function readAndResizeImage(file) {
   });
 }
 
-el.fileInput.addEventListener("change", async () => {
-  const file = el.fileInput.files[0];
+async function handleFile(file) {
   if (!file) return;
-  pendingImage = await readAndResizeImage(file);
-  startCalibration();
+  if (!file.type || !file.type.startsWith("image/")) {
+    showToast("That doesn't look like an image — try a PNG, JPG, WebP, or SVG.");
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    showToast("That image is a little large — try something under 30MB.");
+    return;
+  }
+  const processingTimer = setTimeout(() => showToast("Processing…", { sticky: true }), 150);
+  try {
+    pendingImage = await readAndResizeImage(file);
+    clearTimeout(processingTimer);
+    hideToast();
+    startCalibration();
+  } catch {
+    clearTimeout(processingTimer);
+    hideToast();
+    showToast("Couldn't read that image — try a different file.");
+  }
+}
+
+el.fileInput.addEventListener("change", () => {
+  handleFile(el.fileInput.files[0]);
+  el.fileInput.value = "";
 });
+
+["dragenter", "dragover"].forEach((evt) =>
+  el.dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    el.dropzone.classList.add("dragover");
+  })
+);
+["dragleave", "drop"].forEach((evt) =>
+  el.dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    el.dropzone.classList.remove("dragover");
+  })
+);
+el.dropzone.addEventListener("drop", (e) => {
+  handleFile(e.dataTransfer.files[0]);
+});
+
+el.demoBtn.addEventListener("click", loadDemo);
+
+function loadDemo() {
+  const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(DEMO_SVG);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 400;
+    canvas.getContext("2d").drawImage(img, 0, 0, 400, 400);
+    state = {
+      imageDataUrl: canvas.toDataURL("image/png"),
+      width: 400,
+      height: 400,
+      eyeL: { xPct: 38, yPct: 46 },
+      eyeR: { xPct: 62, yPct: 46 },
+      size: state?.size || 140,
+      eyeSize: state?.eyeSize || 16,
+      corner: state?.corner || "bottom-right",
+    };
+    saveState();
+    renderMascot();
+  };
+  img.onerror = () => showToast("Couldn't load the demo — try uploading your own image instead.");
+  img.src = dataUrl;
+}
 
 function startCalibration() {
   el.intro.hidden = true;
   el.mascot.hidden = true;
-  el.settingsToggle.hidden = true;
-  el.settings.hidden = true;
   el.calibrate.hidden = false;
   el.calibrateImg.src = pendingImage.dataUrl;
   calibMarks = [];
@@ -103,27 +207,46 @@ function renderCalibMarks() {
   });
 }
 
-el.calibrateStage.addEventListener("click", (e) => {
-  if (calibMarks.length >= 2) return;
-  const rect = el.calibrateImg.getBoundingClientRect();
-  if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
-  const xPct = ((e.clientX - rect.left) / rect.width) * 100;
-  const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-  calibMarks.push({ xPct, yPct });
-  renderCalibMarks();
-  if (calibMarks.length === 1) {
+function updateCalibStep() {
+  if (calibMarks.length === 0) {
+    el.calibrateStep.innerHTML = "Click the <strong>left eye</strong> spot.";
+    el.calibrateConfirm.hidden = true;
+  } else if (calibMarks.length === 1) {
     el.calibrateStep.innerHTML = "Now the <strong>right eye</strong> spot.";
+    el.calibrateConfirm.hidden = true;
   } else {
     el.calibrateStep.innerHTML = "Good — confirm, or start over.";
     el.calibrateConfirm.hidden = false;
   }
+}
+
+el.calibrateStage.addEventListener("click", (e) => {
+  const rect = el.calibrateImg.getBoundingClientRect();
+  if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+  const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+  const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+
+  const hitIndex = calibMarks.findIndex((m) => {
+    const dxPx = ((m.xPct - xPct) / 100) * rect.width;
+    const dyPx = ((m.yPct - yPct) / 100) * rect.height;
+    return Math.hypot(dxPx, dyPx) < 16;
+  });
+
+  if (hitIndex !== -1) {
+    calibMarks.splice(hitIndex, 1);
+  } else if (calibMarks.length < 2) {
+    calibMarks.push({ xPct, yPct });
+  } else {
+    return;
+  }
+  renderCalibMarks();
+  updateCalibStep();
 });
 
 el.calibrateReset.addEventListener("click", () => {
   calibMarks = [];
   renderCalibMarks();
-  el.calibrateStep.innerHTML = "Click the <strong>left eye</strong> spot.";
-  el.calibrateConfirm.hidden = true;
+  updateCalibStep();
 });
 
 el.calibrateConfirm.addEventListener("click", () => {
@@ -146,13 +269,13 @@ function renderMascot() {
   el.intro.hidden = true;
   el.calibrate.hidden = true;
   el.mascot.hidden = false;
-  el.settingsToggle.hidden = false;
 
   el.mascotImg.src = state.imageDataUrl;
   const aspect = state.height / state.width;
   el.mascot.style.width = state.size + "px";
   el.mascot.style.height = Math.round(state.size * aspect) + "px";
-  el.mascot.className = "corner-" + state.corner;
+  el.mascot.classList.remove("corner-bottom-right", "corner-bottom-left", "corner-top-right", "corner-top-left");
+  el.mascot.classList.add("corner-" + state.corner);
 
   positionEye(el.eyeL, state.eyeL);
   positionEye(el.eyeR, state.eyeR);
@@ -178,21 +301,29 @@ function setEyeSize(pct) {
 
 el.recalibrateBtn.addEventListener("click", () => {
   pendingImage = { dataUrl: state.imageDataUrl, width: state.width, height: state.height };
+  closeSettings();
   startCalibration();
 });
 
 el.newImageBtn.addEventListener("click", () => {
   state = null;
   localStorage.removeItem(STORAGE_KEY);
+  closeSettings();
   el.mascot.hidden = true;
-  el.settingsToggle.hidden = true;
-  el.settings.hidden = true;
-  el.fileInput.value = "";
   el.intro.hidden = false;
 });
 
+function openSettings() {
+  el.settings.hidden = false;
+  el.settingsToggle.setAttribute("aria-expanded", "true");
+}
+function closeSettings() {
+  el.settings.hidden = true;
+  el.settingsToggle.setAttribute("aria-expanded", "false");
+}
 el.settingsToggle.addEventListener("click", () => {
-  el.settings.hidden = !el.settings.hidden;
+  if (el.settings.hidden) openSettings();
+  else closeSettings();
 });
 
 el.sizeRange.addEventListener("input", () => {
@@ -209,35 +340,104 @@ el.eyeRange.addEventListener("input", () => {
 
 el.cornerSelect.addEventListener("change", () => {
   state.corner = el.cornerSelect.value;
-  el.mascot.className = "corner-" + state.corner;
+  renderMascot();
   saveState();
 });
 
-window.addEventListener("mousemove", (e) => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+el.downloadBtn.addEventListener("click", exportPNG);
+
+function exportPNG() {
+  const canvas = document.createElement("canvas");
+  canvas.width = state.width;
+  canvas.height = state.height;
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, state.width, state.height);
+    drawEye(ctx, state.eyeL, canvas.width, state.eyeSize);
+    drawEye(ctx, state.eyeR, canvas.width, state.eyeSize);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        showToast("Couldn't export that image.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "page-buddy.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, "image/png");
+  };
+  img.src = state.imageDataUrl;
+}
+
+function drawEye(ctx, pos, refWidth, eyeSizePct) {
+  const cx = (pos.xPct / 100) * refWidth;
+  const cy = (pos.yPct / 100) * ctx.canvas.height;
+  const r = (eyeSizePct / 100) * refWidth / 2;
+
+  const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r);
+  grad.addColorStop(0, "#ffffff");
+  grad.addColorStop(1, "#eceae5");
+  ctx.beginPath();
+  ctx.fillStyle = grad;
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.08);
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.stroke();
+
+  const pr = r * 0.46;
+  const pgrad = ctx.createRadialGradient(cx - pr * 0.35, cy - pr * 0.3, pr * 0.1, cx, cy, pr);
+  pgrad.addColorStop(0, "#4a4a4a");
+  pgrad.addColorStop(1, "#0b0b0c");
+  ctx.beginPath();
+  ctx.fillStyle = pgrad;
+  ctx.arc(cx, cy, pr, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+window.addEventListener("pointermove", (e) => {
+  pointer.x = e.clientX;
+  pointer.y = e.clientY;
+  lastPointerTime = performance.now();
 });
-window.addEventListener(
-  "touchmove",
-  (e) => {
-    if (e.touches[0]) {
-      mouse.x = e.touches[0].clientX;
-      mouse.y = e.touches[0].clientY;
-    }
-  },
-  { passive: true }
-);
+window.addEventListener("pointerdown", (e) => {
+  pointer.x = e.clientX;
+  pointer.y = e.clientY;
+  lastPointerTime = performance.now();
+});
 
 let currentTilt = 0;
 
 function trackLoop() {
   if (!el.mascot.hidden) {
+    const mrect = el.mascot.getBoundingClientRect();
+    const mcx = mrect.left + mrect.width / 2;
+    const mcy = mrect.top + mrect.height / 2;
+
+    const idle = performance.now() - lastPointerTime > IDLE_MS;
+    let targetX = pointer.x;
+    let targetY = pointer.y;
+
+    if (idle && !prefersReducedMotion) {
+      const t = performance.now() / 1000;
+      targetX = mcx + Math.sin(t * 0.35) * 140 + Math.sin(t * 0.13) * 40;
+      targetY = mcy + Math.cos(t * 0.27) * 60;
+    } else if (idle) {
+      targetX = mcx;
+      targetY = mcy;
+    }
+
     [el.eyeL, el.eyeR].forEach((eye) => {
       const rect = eye.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const dx = mouse.x - cx;
-      const dy = mouse.y - cy;
+      const dx = targetX - cx;
+      const dy = targetY - cy;
       const angle = Math.atan2(dy, dx);
       const maxOffset = rect.width * 0.24;
       const dist = Math.min(Math.hypot(dx, dy) * 0.06, maxOffset);
@@ -245,11 +445,14 @@ function trackLoop() {
       pupil.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
     });
 
-    const mrect = el.mascot.getBoundingClientRect();
-    const mcx = mrect.left + mrect.width / 2;
-    const targetTilt = Math.max(-8, Math.min(8, (mouse.x - mcx) / 22));
-    currentTilt += (targetTilt - currentTilt) * 0.12;
-    el.mascot.style.transform = `rotate(${currentTilt.toFixed(2)}deg)`;
+    if (prefersReducedMotion) {
+      currentTilt = 0;
+      el.mascotVisual.style.transform = "";
+    } else {
+      const targetTilt = Math.max(-8, Math.min(8, (targetX - mcx) / 22));
+      currentTilt += (targetTilt - currentTilt) * 0.12;
+      el.mascotVisual.style.transform = `rotate(${currentTilt.toFixed(2)}deg)`;
+    }
   }
   requestAnimationFrame(trackLoop);
 }
@@ -257,8 +460,8 @@ requestAnimationFrame(trackLoop);
 
 function blink() {
   if (el.mascot.hidden) return;
-  el.mascot.classList.add("blinking");
-  setTimeout(() => el.mascot.classList.remove("blinking"), 130);
+  el.mascotVisual.classList.add("blinking");
+  setTimeout(() => el.mascotVisual.classList.remove("blinking"), 130);
 }
 
 function scheduleBlink() {
@@ -270,13 +473,20 @@ function scheduleBlink() {
 }
 scheduleBlink();
 
-el.mascot.addEventListener("click", () => {
+function poke() {
   blink();
-  el.mascot.classList.remove("poked");
-  void el.mascot.offsetWidth;
-  el.mascot.classList.add("poked");
+  el.mascotVisual.classList.remove("poked");
+  void el.mascotVisual.offsetWidth;
+  el.mascotVisual.classList.add("poked");
+}
+el.mascotVisual.addEventListener("click", poke);
+el.mascotVisual.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    poke();
+  }
 });
-el.mascot.addEventListener("animationend", () => el.mascot.classList.remove("poked"));
+el.mascotVisual.addEventListener("animationend", () => el.mascotVisual.classList.remove("poked"));
 
 if (state && state.imageDataUrl && state.eyeL && state.eyeR) {
   renderMascot();

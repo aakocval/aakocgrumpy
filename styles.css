@@ -2,7 +2,7 @@
   color-scheme: light dark;
   --bg: #f6f5f2;
   --fg: #1c1b1a;
-  --muted: #6b6863;
+  --muted: #5f5c56;
   --accent: #2d6cdf;
   --card: #ffffff;
   --border: #e3e0da;
@@ -12,7 +12,7 @@
   :root {
     --bg: #16161a;
     --fg: #f2f1ee;
-    --muted: #9a978f;
+    --muted: #aba895;
     --accent: #6ea2ff;
     --card: #201f24;
     --border: #35333a;
@@ -29,10 +29,42 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
 }
 
+button, select, input {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toast {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translate(-50%, -12px);
+  z-index: 2000;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.85rem;
+  max-width: min(90vw, 360px);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 #intro {
   max-width: 560px;
   margin: 12vh auto 0;
-  padding: 0 24px 48px;
+  padding: 0 24px max(48px, calc(env(safe-area-inset-bottom, 0px) + 24px));
   text-align: center;
 }
 
@@ -48,11 +80,27 @@ body {
 }
 
 .hint { font-size: 0.85rem; }
+.privacy-hint { margin-top: 22px; }
+
+.dropzone {
+  margin: 28px 0 4px;
+  padding: 22px;
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone.dragover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.dropzone .hint { margin: 10px 0 0; }
 
 .upload-btn {
   display: inline-block;
-  margin: 20px 0 8px;
-  padding: 12px 22px;
+  padding: 13px 24px;
+  min-height: 44px;
   background: var(--accent);
   color: #fff;
   border-radius: 999px;
@@ -64,15 +112,30 @@ body {
 .upload-btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .upload-btn:active { transform: translateY(0); }
 
+.text-btn {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 6px 4px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.text-btn:hover { text-decoration: underline; }
+
 #calibrate {
   max-width: 640px;
   margin: 6vh auto 0;
-  padding: 0 24px 48px;
+  padding: 0 24px max(48px, calc(env(safe-area-inset-bottom, 0px) + 24px));
   text-align: center;
 }
 
 #calibrate-step { color: var(--muted); margin-bottom: 16px; }
 #calibrate-step strong { color: var(--fg); }
+#calibrate > .hint { color: var(--muted); margin-top: 12px; }
 
 #calibrate-stage {
   position: relative;
@@ -102,9 +165,9 @@ body {
 
 .calib-mark {
   position: absolute;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border-radius: 50%;
   background: var(--accent);
   border: 2px solid #fff;
@@ -119,7 +182,8 @@ body {
 }
 
 .calibrate-actions button {
-  padding: 10px 18px;
+  padding: 12px 18px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--card);
@@ -139,22 +203,33 @@ body {
   width: 140px;
   height: 140px;
   z-index: 1000;
+}
+
+#mascot.corner-bottom-right { right: max(24px, env(safe-area-inset-right, 0px)); bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+#mascot.corner-bottom-left  { left: max(24px, env(safe-area-inset-left, 0px));  bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+#mascot.corner-top-right    { right: max(24px, env(safe-area-inset-right, 0px)); top: max(24px, env(safe-area-inset-top, 0px)); }
+#mascot.corner-top-left     { left: max(24px, env(safe-area-inset-left, 0px));  top: max(24px, env(safe-area-inset-top, 0px)); }
+
+#mascot-visual {
+  position: absolute;
+  inset: 0;
   cursor: pointer;
   transition: transform 0.12s ease-out;
   filter: drop-shadow(0 6px 16px rgba(0,0,0,0.25));
+  border-radius: 12px;
 }
 
-#mascot.corner-bottom-right { right: 24px; bottom: 24px; }
-#mascot.corner-bottom-left { left: 24px; bottom: 24px; }
-#mascot.corner-top-right { right: 24px; top: 24px; }
-#mascot.corner-top-left { left: 24px; top: 24px; }
-
-#mascot.poked { animation: poke 0.28s ease; }
+#mascot-visual.poked { animation: poke 0.28s ease; }
 
 @keyframes poke {
   0% { transform: scale(1); }
   35% { transform: scale(0.92, 1.06); }
   100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #mascot-visual { transition: none; }
+  #mascot-visual.poked { animation: none; }
 }
 
 #mascot-img {
@@ -178,7 +253,7 @@ body {
   transition: transform 0.1s ease-in;
 }
 
-#mascot.blinking .eye {
+#mascot-visual.blinking .eye {
   transform: scaleY(0.08);
   transition: transform 0.09s ease-in;
 }
@@ -195,28 +270,28 @@ body {
 }
 
 #settings-toggle {
-  position: fixed;
-  z-index: 1001;
-  right: 24px;
-  bottom: 176px;
-  width: 34px;
-  height: 34px;
+  position: absolute;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--fg);
   cursor: pointer;
-  font-size: 15px;
-  opacity: 0.55;
+  font-size: 14px;
+  opacity: 0.7;
   transition: opacity 0.15s ease;
+  z-index: 1;
 }
 #settings-toggle:hover { opacity: 1; }
 
+#mascot.corner-bottom-right #settings-toggle { top: -10px; left: -10px; }
+#mascot.corner-bottom-left  #settings-toggle { top: -10px; right: -10px; }
+#mascot.corner-top-right    #settings-toggle { bottom: -10px; left: -10px; }
+#mascot.corner-top-left     #settings-toggle { bottom: -10px; right: -10px; }
+
 #settings {
-  position: fixed;
-  z-index: 1001;
-  right: 24px;
-  bottom: 216px;
+  position: absolute;
   width: 220px;
   padding: 14px;
   border-radius: 14px;
@@ -227,12 +302,19 @@ body {
   flex-direction: column;
   gap: 10px;
   font-size: 0.85rem;
+  z-index: 2;
 }
+
+#mascot.corner-bottom-right #settings, #mascot.corner-bottom-left #settings { bottom: calc(100% + 16px); }
+#mascot.corner-top-right    #settings, #mascot.corner-top-left    #settings { top: calc(100% + 16px); }
+#mascot.corner-bottom-right #settings, #mascot.corner-top-right   #settings { right: 0; }
+#mascot.corner-bottom-left  #settings, #mascot.corner-top-left    #settings { left: 0; }
 
 #settings label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 #settings input[type="range"] { width: 100%; }
 #settings select {
-  padding: 6px 8px;
+  padding: 8px;
+  min-height: 40px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
@@ -240,7 +322,8 @@ body {
 }
 
 #settings button {
-  padding: 8px 10px;
+  padding: 10px;
+  min-height: 40px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
