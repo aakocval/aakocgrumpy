@@ -423,7 +423,7 @@ window.addEventListener("pointerdown", (e) => {
 const instances = [];
 
 function registerBuddy({ root, visual, eyeL, eyeR, visible }) {
-  const inst = { root, visual, eyeL, eyeR, visible, tilt: 0 };
+  const inst = { root, visual, eyeL, eyeR, visible };
   instances.push(inst);
   scheduleBlink(inst);
   return inst;
@@ -479,15 +479,6 @@ function trackLoop() {
       const pupil = eye.querySelector(".pupil");
       pupil.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
     });
-
-    if (prefersReducedMotion) {
-      inst.tilt = 0;
-      inst.visual.style.transform = "";
-    } else {
-      const targetTilt = Math.max(-8, Math.min(8, (targetX - mcx) / 22));
-      inst.tilt += (targetTilt - inst.tilt) * 0.12;
-      inst.visual.style.transform = `rotate(${inst.tilt.toFixed(2)}deg)`;
-    }
   });
   requestAnimationFrame(trackLoop);
 }

@@ -304,7 +304,6 @@ button, select, input {
 
 .buddy-visual {
   cursor: pointer;
-  transition: transform 0.12s ease-out;
   filter: drop-shadow(0 6px 16px rgba(0,0,0,0.25));
   border-radius: 12px;
 }
@@ -318,7 +317,6 @@ button, select, input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .buddy-visual { transition: none; }
   .buddy-visual.poked { animation: none; }
 }
 
