@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>page-buddy</title>
+<meta name="description" content="Turn any image into a cursor-tracking, blinking mascot for your site." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<main id="intro">
+  <h1>page-buddy</h1>
+  <p>Give any picture a pair of eyes. Upload a photo, a logo, whatever — it'll watch your cursor and blink when you poke it.</p>
+  <label class="upload-btn">
+    Choose an image
+    <input type="file" id="file-input" accept="image/*" hidden />
+  </label>
+  <p class="hint">Nothing leaves your browser — no server, no account, no AI.</p>
+</main>
+
+<section id="calibrate" hidden>
+  <p id="calibrate-step">Click the <strong>left eye</strong> spot (buddy's left, your right won't matter — just be consistent).</p>
+  <div id="calibrate-stage">
+    <img id="calibrate-img" alt="uploaded image" />
+    <div id="calibrate-marks"></div>
+  </div>
+  <div class="calibrate-actions">
+    <button id="calibrate-reset" type="button">Start over</button>
+    <button id="calibrate-confirm" type="button" hidden>Looks good</button>
+  </div>
+</section>
+
+<div id="mascot" hidden>
+  <img id="mascot-img" alt="your buddy" draggable="false" />
+  <div class="eye" id="eye-l"><div class="pupil"></div></div>
+  <div class="eye" id="eye-r"><div class="pupil"></div></div>
+</div>
+
+<button id="settings-toggle" type="button" hidden title="Settings">⚙</button>
+
+<div id="settings" hidden>
+  <label>Size <input type="range" id="size-range" min="60" max="320" value="140" /></label>
+  <label>Eye size <input type="range" id="eye-range" min="8" max="40" value="16" /></label>
+  <label>Corner
+    <select id="corner-select">
+      <option value="bottom-right">Bottom right</option>
+      <option value="bottom-left">Bottom left</option>
+      <option value="top-right">Top right</option>
+      <option value="top-left">Top left</option>
+    </select>
+  </label>
+  <button id="recalibrate-btn" type="button">Re-place eyes</button>
+  <button id="new-image-btn" type="button">New image</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
