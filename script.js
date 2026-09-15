@@ -1,17 +1,21 @@
-const STORAGE_KEY = "aakocbuddy-state-v1";
+const STORAGE_KEY = "aakocgrumpy-state-v1";
 const MAX_IMAGE_DIM = 640;
 const MAX_FILE_BYTES = 30 * 1024 * 1024;
 const IDLE_MS = 3500;
 
-const DEMO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#ffb37a"/><stop offset="1" stop-color="#ff8a5c"/>
-  </linearGradient></defs>
-  <rect x="40" y="50" width="320" height="300" rx="140" ry="130" fill="url(#g)"/>
-  <ellipse cx="120" cy="232" rx="26" ry="15" fill="#ff6b4a" opacity="0.35"/>
-  <ellipse cx="280" cy="232" rx="26" ry="15" fill="#ff6b4a" opacity="0.35"/>
-  <path d="M160 265 Q200 296 240 265" stroke="#7a3412" stroke-width="9" fill="none" stroke-linecap="round"/>
+const DEMO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 442 419">
+  <path d="M373.606 0C380.037 0.211875 383.156 5.90563 384.881 11.455C397.156 50.95 404.168 93.7719 406.437 135.041C407.331 150.996 406.674 167 404.481 182.828C402.368 197.484 398.949 211.811 398.218 226.687C397.456 242.279 398.324 257.911 398.593 273.517C398.949 294.246 398.343 314.874 398.099 335.586C397.868 346.936 397.874 358.291 398.112 369.641C398.549 389.548 403.093 416.051 375.543 417.678C362.774 418.431 349.831 418.334 337.037 418.484C306.487 418.822 275.931 418.967 245.381 418.918L181.62 418.839C168.099 418.797 154.006 418.754 140.512 417.9C132.892 417.418 126.199 414.511 119.529 411.093C69.24 385.317 50.045 342.191 51.7325 287.204C52.2056 262.213 55.4331 236.721 47.6162 212.45C42.1531 195.486 33.1712 180.024 22.2124 166.032C14.5381 156.234 5.19744 149.989 1.15244 137.68C-1.17693 127.784 -0.187568 119.144 6.08118 110.785C11.2543 103.836 19.0318 99.2888 27.625 98.1906C53.4812 94.8194 74.0618 123.499 84.5868 143.388C103.902 179.89 102.202 220.417 98.5862 260.195C97.1987 275.457 96.9481 292.466 98.4324 307.728C101.165 328.866 110.191 343.13 126.814 355.973C127.646 319.093 128.978 289.637 139.436 253.643C145.242 233.658 154.577 209.769 157.867 189.98C160.824 172.194 161.551 150.144 163.231 131.74C165.719 103.947 170.657 76.4294 177.989 49.5069C180.699 39.5812 189.05 7.30875 197.481 3.015C198.799 2.34375 200.281 2.07813 201.676 2.65375C209.947 6.07063 223.074 43.975 227.106 54.0388C261.168 50.5719 309.218 50.05 342.818 54.4869C348.462 42.5581 363.218 6.48438 373.606 0Z" fill="#181818"/>
+  <rect x="366.907" y="186.498" width="75" height="2" transform="rotate(-10.8253 366.907 186.498)" fill="#181818"/>
+  <rect width="75" height="2" transform="matrix(0.982204 0.187815 0.187815 -0.982204 366.206 196.681)" fill="#181818"/>
+  <rect x="366.206" y="190.717" width="75" height="2" fill="#181818"/>
+  <rect width="75" height="2" transform="matrix(-0.982204 -0.187815 -0.187815 0.982204 202.504 186.498)" fill="#181818"/>
+  <rect x="202.247" y="196.681" width="75" height="2" transform="rotate(169.175 202.247 196.681)" fill="#181818"/>
+  <rect width="75" height="2" transform="matrix(-1 0 0 1 203.206 190.717)" fill="#181818"/>
 </svg>`;
+const DEMO_WIDTH = 442;
+const DEMO_HEIGHT = 419;
+const DEMO_EYE_L = { xPct: 52.49, yPct: 31.62 };
+const DEMO_EYE_R = { xPct: 77.38, yPct: 31.62 };
 
 const el = {
   toast: document.getElementById("toast"),
@@ -170,15 +174,15 @@ function loadDemo() {
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = 400;
-    canvas.height = 400;
-    canvas.getContext("2d").drawImage(img, 0, 0, 400, 400);
+    canvas.width = DEMO_WIDTH;
+    canvas.height = DEMO_HEIGHT;
+    canvas.getContext("2d").drawImage(img, 0, 0, DEMO_WIDTH, DEMO_HEIGHT);
     state = {
       imageDataUrl: canvas.toDataURL("image/png"),
-      width: 400,
-      height: 400,
-      eyeL: { xPct: 38, yPct: 46 },
-      eyeR: { xPct: 62, yPct: 46 },
+      width: DEMO_WIDTH,
+      height: DEMO_HEIGHT,
+      eyeL: DEMO_EYE_L,
+      eyeR: DEMO_EYE_R,
       size: state?.size || 140,
       eyeSize: state?.eyeSize || 16,
       corner: state?.corner || "bottom-right",
@@ -369,7 +373,7 @@ function exportPNG() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "aakocbuddy.png";
+      a.download = "aakocgrumpy.png";
       document.body.appendChild(a);
       a.click();
       a.remove();
